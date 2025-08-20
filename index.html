@@ -118,7 +118,7 @@
             2020: { teto: 6101.06, contribuicaoMaxima: 713.10 },
             2021: { teto: 6433.57, contribuicaoMaxima: 751.99 },
             2022: { teto: 7087.22, contribuicaoMaxima: 828.39 },
-            2023: { teto: 7507.49, contribuicaoMaxima: 876.97 },
+            2023: { teto: 7507.49, contribuicaoMaxima: 877.05 }, // Valor máximo ajustado para 2023
             2024: { teto: 7786.02, contribuicaoMaxima: 908.85 },
             2025: { teto: 8157.41, contribuicaoMaxima: 959.22 } // Fictício
         };
@@ -143,7 +143,13 @@
                 { limite: 3641.03, aliquota: 0.12,  deducao: 91.00 },
                 { limite: 7087.22, aliquota: 0.14,  deducao: 163.82 }
             ],
-            2023: [ // A partir de Mai/2023 (usaremos este para o ano todo por simplicidade)
+            '2023-jan': [ // Faixas de Jan a Abr de 2023
+                { limite: 1302.00, aliquota: 0.075, deducao: 0 },
+                { limite: 2571.29, aliquota: 0.09,  deducao: 19.53 },
+                { limite: 3856.94, aliquota: 0.12,  deducao: 96.67 },
+                { limite: 7507.49, aliquota: 0.14,  deducao: 173.81 }
+            ],
+            '2023-mai': [ // Faixas de Mai a Dez de 2023
                 { limite: 1320.00, aliquota: 0.075, deducao: 0 },
                 { limite: 2571.29, aliquota: 0.09,  deducao: 19.80 },
                 { limite: 3856.94, aliquota: 0.12,  deducao: 96.94 },
@@ -185,10 +191,24 @@
         // --- LÓGICA PRINCIPAL ---
 
         // Função para calcular a previsão do INSS retido
-        function calcularINSSPrevisto(remuneracao, ano) {
-            if (!ano || !faixasParaCalculo[ano] || remuneracao <= 0) {
+        function calcularINSSPrevisto(remuneracao, competencia) {
+            if (!competencia || remuneracao <= 0) {
                 return 0;
             }
+
+            const [ano, mes] = competencia.split('-').map(Number);
+            let faixas;
+
+            if (ano === 2023) {
+                faixas = mes >= 5 ? faixasParaCalculo['2023-mai'] : faixasParaCalculo['2023-jan'];
+            } else {
+                faixas = faixasParaCalculo[ano];
+            }
+
+            if (!faixas) {
+                return 0;
+            }
+            
             const teto = dadosTeto[ano].teto;
             const contribuicaoMaxima = dadosTeto[ano].contribuicaoMaxima;
 
@@ -196,13 +216,11 @@
                 return contribuicaoMaxima;
             }
 
-            const faixas = faixasParaCalculo[ano];
             let contribuicao = 0;
-
             for (const faixa of faixas) {
                 if (remuneracao <= faixa.limite) {
                     contribuicao = (remuneracao * faixa.aliquota) - faixa.deducao;
-                    break; // Encontrou a faixa correta
+                    break;
                 }
             }
             return contribuicao > 0 ? contribuicao : 0;
@@ -249,9 +267,9 @@
             row.innerHTML = `
                 <td class="px-2 py-2"><select class="competencia-select w-full p-2 border rounded-md bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500">${monthOptions}</select></td>
                 <td class="px-2 py-2"><input type="number" step="0.01" placeholder="6000,00" value="${data.rem1}" class="remun-input-1 w-full p-2 border rounded-md text-right focus:outline-none focus:ring-2 focus:ring-blue-500"></td>
-                <td class="px-2 py-2"><input type="number" step="0.01" placeholder="547,06" value="${data.inss1}" class="inss-input-1 w-full p-2 border rounded-md text-right focus:outline-none focus:ring-2 focus:ring-blue-500"></td>
+                <td class="px-2 py-2"><input type="number" step="0.01" placeholder="0,00" value="${data.inss1}" class="inss-input-1 w-full p-2 border rounded-md text-right focus:outline-none focus:ring-2 focus:ring-blue-500"></td>
                 <td class="px-2 py-2"><input type="number" step="0.01" placeholder="5000,00" value="${data.rem2}" class="remun-input-2 w-full p-2 border rounded-md text-right focus:outline-none focus:ring-2 focus:ring-blue-500"></td>
-                <td class="px-2 py-2"><input type="number" step="0.01" placeholder="450,90" value="${data.inss2}" class="inss-input-2 w-full p-2 border rounded-md text-right focus:outline-none focus:ring-2 focus:ring-blue-500"></td>
+                <td class="px-2 py-2"><input type="number" step="0.01" placeholder="0,00" value="${data.inss2}" class="inss-input-2 w-full p-2 border rounded-md text-right focus:outline-none focus:ring-2 focus:ring-blue-500"></td>
                 <td class="px-2 py-2"><span class="total-remun block text-right p-2">R$ 0,00</span></td>
                 <td class="px-2 py-2"><span class="total-inss block text-right p-2">R$ 0,00</span></td>
                 <td class="px-2 py-2"><span class="teto-inss block text-right p-2">R$ 0,00</span></td>
@@ -270,8 +288,7 @@
             const handlePrediction = (remunInput, inssInput) => {
                 const remuneracao = parseFloat(remunInput.value) || 0;
                 const competencia = competenciaSelect.value;
-                const ano = competencia ? parseInt(competencia.split('-')[0]) : null;
-                const inssPrevisto = calcularINSSPrevisto(remuneracao, ano);
+                const inssPrevisto = calcularINSSPrevisto(remuneracao, competencia);
                 
                 if (inssPrevisto > 0) {
                     inssInput.value = inssPrevisto.toFixed(2);
@@ -372,10 +389,32 @@
         document.addEventListener('DOMContentLoaded', () => {
             popularTabelaTeto();
             criarLinhaCalculadora({ comp: '2024-01', rem1: '6000', inss1: '642.34', rem2: '5000', inss2: '531.18' });
-            criarLinhaCalculadora({ comp: '2024-02', rem1: '6000', inss1: '642.34', rem2: '5000', inss2: '531.18' });
+            criarLinhaCalculadora({ comp: '2023-04', rem1: '6000', inss1: '642.34', rem2: '5000', inss2: '531.18' });
             criarLinhaCalculadora();
             
-            mainCalcBody.querySelectorAll('tr').forEach(row => calcularLinha(row));
+            mainCalcBody.querySelectorAll('tr').forEach(row => {
+                 // Dispara o cálculo inicial para preencher os valores previstos do INSS
+                const remun1 = row.querySelector('.remun-input-1');
+                const inss1 = row.querySelector('.inss-input-1');
+                const remun2 = row.querySelector('.remun-input-2');
+                const inss2 = row.querySelector('.inss-input-2');
+                const competenciaSelect = row.querySelector('.competencia-select');
+
+                const remuneracao1 = parseFloat(remun1.value) || 0;
+                const competencia = competenciaSelect.value;
+                if(remuneracao1 > 0) {
+                    const inssPrevisto1 = calcularINSSPrevisto(remuneracao1, competencia);
+                    inss1.value = inssPrevisto1 > 0 ? inssPrevisto1.toFixed(2) : '';
+                }
+
+                const remuneracao2 = parseFloat(remun2.value) || 0;
+                 if(remuneracao2 > 0) {
+                    const inssPrevisto2 = calcularINSSPrevisto(remuneracao2, competencia);
+                    inss2.value = inssPrevisto2 > 0 ? inssPrevisto2.toFixed(2) : '';
+                }
+
+                calcularLinha(row)
+            });
         });
 
         addRowBtn.addEventListener('click', () => criarLinhaCalculadora());
