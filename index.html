@@ -1,0 +1,387 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Calculadora de Restituição de Contribuição do INSS</title>
+    <!-- Tailwind CSS para estilização -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Biblioteca SheetJS (xlsx) para exportar para Excel -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        /* Estilo para os inputs numéricos */
+        input[type="number"]::-webkit-inner-spin-button,
+        input[type="number"]::-webkit-outer-spin-button {
+            -webkit-appearance: none;
+            margin: 0;
+        }
+        input[type="number"] {
+            -moz-appearance: textfield;
+        }
+        .table-header-custom {
+            background-color: #4A5568; /* Um cinza-azulado escuro */
+        }
+        .total-cell-custom {
+            background-color: #fefcbf; /* Um amarelo claro */
+        }
+    </style>
+</head>
+<body class="bg-gray-100 text-gray-800 p-4 sm:p-6 md:p-8">
+
+    <div class="max-w-7xl mx-auto bg-white rounded-2xl shadow-lg p-6 md:p-8">
+        
+        <header class="mb-8 text-center">
+            <h1 class="text-3xl md:text-4xl font-bold text-gray-700">Calculadora de Restituição do INSS</h1>
+            <p class="text-gray-500 mt-2">Para contribuições pagas acima do teto por múltiplas fontes pagadoras.</p>
+        </header>
+
+        <!-- Seção de Tabela de Referência do Teto do INSS -->
+        <div class="mb-10">
+            <h2 class="text-2xl font-semibold mb-4 text-gray-600">Tabela de Referência - Teto do INSS</h2>
+            <div class="overflow-x-auto rounded-lg border">
+                <table class="w-full text-sm text-left text-gray-500">
+                    <thead class="text-xs text-white uppercase table-header-custom">
+                        <tr>
+                            <th scope="col" class="px-6 py-3">Ano</th>
+                            <th scope="col" class="px-6 py-3">Valor Mensal do Teto (R$)</th>
+                            <th scope="col" class="px-6 py-3">Contribuição Máxima (R$)</th>
+                        </tr>
+                    </thead>
+                    <tbody id="teto-table-body" class="bg-white">
+                        <!-- Dados serão inseridos via JavaScript -->
+                    </tbody>
+                </table>
+            </div>
+             <p class="text-xs text-gray-400 mt-2">*O valor para 2025 é uma estimativa para fins de exemplo.</p>
+        </div>
+
+        <!-- Seção da Calculadora Principal -->
+        <div>
+            <h2 class="text-2xl font-semibold mb-4 text-gray-600">Planilha de Cálculo para Apuração</h2>
+            <div class="overflow-x-auto rounded-lg border">
+                <table class="w-full text-sm text-left text-gray-500" id="calculation-table">
+                    <thead class="text-xs text-white uppercase table-header-custom">
+                        <tr>
+                            <th class="px-4 py-3 min-w-[150px]">Competência (Mês/Ano)</th>
+                            <th class="px-4 py-3 min-w-[170px]">Fonte 1 Remun. (R$)</th>
+                            <th class="px-4 py-3 min-w-[170px]">Fonte 1 INSS Retido (R$)</th>
+                            <th class="px-4 py-3 min-w-[170px]">Fonte 2 Remun. (R$)</th>
+                            <th class="px-4 py-3 min-w-[170px]">Fonte 2 INSS Retido (R$)</th>
+                            <th class="px-4 py-3 min-w-[170px]">Total Remun. (R$)</th>
+                            <th class="px-4 py-3 min-w-[170px]">Total INSS Retido (R$)</th>
+                            <th class="px-4 py-3 min-w-[170px]">Teto INSS (R$)</th>
+                            <th class="px-4 py-3 min-w-[170px]">Contribuição Correta (R$)</th>
+                            <th class="px-4 py-3 min-w-[170px] text-yellow-300">Valor a Restituir (R$)</th>
+                        </tr>
+                    </thead>
+                    <tbody id="main-calc-body">
+                        <!-- Linhas da calculadora serão inseridas aqui -->
+                    </tbody>
+                    <tfoot class="font-semibold text-gray-700">
+                        <tr>
+                            <td colspan="9" class="text-right px-4 py-4 text-lg">TOTAL A RESTITUIR:</td>
+                            <td id="total-restituir" class="px-4 py-4 text-lg font-bold text-green-600 total-cell-custom rounded-br-lg">R$ 0,00</td>
+                        </tr>
+                    </tfoot>
+                </table>
+            </div>
+            <div class="mt-6 flex flex-col sm:flex-row gap-4">
+                <button id="add-row-btn" class="w-full sm:w-auto bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg transition duration-300">
+                    Adicionar Nova Linha
+                </button>
+                <button id="export-btn" class="w-full sm:w-auto bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-lg transition duration-300">
+                    Exportar para Excel
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <footer class="text-center mt-8">
+        <p class="text-sm text-gray-500">
+            Criado por Adelson Elias | 
+            <a href="https://adehas25.github.io/declarafacil/" target="_blank" rel="noopener noreferrer" class="font-semibold text-blue-600 hover:underline">
+                Declara Fácil
+            </a>
+            | Todos os direitos reservados.
+        </p>
+    </footer>
+
+    <script>
+        // --- DADOS DE REFERÊNCIA ---
+        const dadosTeto = {
+            2020: { teto: 6101.06, contribuicaoMaxima: 713.10 },
+            2021: { teto: 6433.57, contribuicaoMaxima: 751.99 },
+            2022: { teto: 7087.22, contribuicaoMaxima: 828.39 },
+            2023: { teto: 7507.49, contribuicaoMaxima: 876.97 },
+            2024: { teto: 7786.02, contribuicaoMaxima: 908.85 },
+            2025: { teto: 8157.41, contribuicaoMaxima: 959.22 } // Fictício
+        };
+
+        // Dados das faixas de contribuição para cálculo automático (usando parcela a deduzir)
+        const faixasParaCalculo = {
+            2020: [ // A partir de Mar/2020
+                { limite: 1045.00, aliquota: 0.075, deducao: 0 },
+                { limite: 2089.60, aliquota: 0.09,  deducao: 15.67 },
+                { limite: 3134.40, aliquota: 0.12,  deducao: 78.36 },
+                { limite: 6101.06, aliquota: 0.14,  deducao: 141.05 }
+            ],
+            2021: [
+                { limite: 1100.00, aliquota: 0.075, deducao: 0 },
+                { limite: 2203.48, aliquota: 0.09,  deducao: 16.50 },
+                { limite: 3305.22, aliquota: 0.12,  deducao: 82.61 },
+                { limite: 6433.57, aliquota: 0.14,  deducao: 148.72 }
+            ],
+            2022: [
+                { limite: 1212.00, aliquota: 0.075, deducao: 0 },
+                { limite: 2427.35, aliquota: 0.09,  deducao: 18.18 },
+                { limite: 3641.03, aliquota: 0.12,  deducao: 91.00 },
+                { limite: 7087.22, aliquota: 0.14,  deducao: 163.82 }
+            ],
+            2023: [ // A partir de Mai/2023 (usaremos este para o ano todo por simplicidade)
+                { limite: 1320.00, aliquota: 0.075, deducao: 0 },
+                { limite: 2571.29, aliquota: 0.09,  deducao: 19.80 },
+                { limite: 3856.94, aliquota: 0.12,  deducao: 96.94 },
+                { limite: 7507.49, aliquota: 0.14,  deducao: 174.08 }
+            ],
+            2024: [
+                { limite: 1412.00, aliquota: 0.075, deducao: 0 },
+                { limite: 2666.68, aliquota: 0.09,  deducao: 21.18 },
+                { limite: 4000.03, aliquota: 0.12,  deducao: 101.18 },
+                { limite: 7786.02, aliquota: 0.14,  deducao: 181.18 }
+            ],
+            2025: [ // Usando 2024 como base para o fictício
+                { limite: 1412.00, aliquota: 0.075, deducao: 0 },
+                { limite: 2666.68, aliquota: 0.09,  deducao: 21.18 },
+                { limite: 4000.03, aliquota: 0.12,  deducao: 101.18 },
+                { limite: 8157.41, aliquota: 0.14,  deducao: 181.18 } // Teto ajustado
+            ]
+        };
+
+        // --- ELEMENTOS DO DOM ---
+        const tetoTableBody = document.getElementById('teto-table-body');
+        const mainCalcBody = document.getElementById('main-calc-body');
+        const addRowBtn = document.getElementById('add-row-btn');
+        const exportBtn = document.getElementById('export-btn');
+        const totalRestituirCell = document.getElementById('total-restituir');
+
+        // --- FUNÇÕES AUXILIARES ---
+        const formatCurrency = (value) => {
+            if (isNaN(value) || value === null) return "R$ 0,00";
+            return value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+        };
+
+        const parseCurrency = (value) => {
+            if (typeof value !== 'string') return 0;
+            const number = parseFloat(value.replace('R$', '').replace(/\./g, '').replace(',', '.').trim());
+            return isNaN(number) ? 0 : number;
+        };
+        
+        // --- LÓGICA PRINCIPAL ---
+
+        // Função para calcular a previsão do INSS retido
+        function calcularINSSPrevisto(remuneracao, ano) {
+            if (!ano || !faixasParaCalculo[ano] || remuneracao <= 0) {
+                return 0;
+            }
+            const teto = dadosTeto[ano].teto;
+            const contribuicaoMaxima = dadosTeto[ano].contribuicaoMaxima;
+
+            if (remuneracao >= teto) {
+                return contribuicaoMaxima;
+            }
+
+            const faixas = faixasParaCalculo[ano];
+            let contribuicao = 0;
+
+            for (const faixa of faixas) {
+                if (remuneracao <= faixa.limite) {
+                    contribuicao = (remuneracao * faixa.aliquota) - faixa.deducao;
+                    break; // Encontrou a faixa correta
+                }
+            }
+            return contribuicao > 0 ? contribuicao : 0;
+        }
+
+        // Função para gerar as opções de Mês/Ano de 2020 a 2025
+        function generateMonthOptions(selectedValue) {
+            let optionsHtml = '<option value="">Selecione...</option>';
+            const startYear = 2020;
+            const endYear = 2025;
+
+            for (let year = endYear; year >= startYear; year--) {
+                for (let month = 12; month >= 1; month--) {
+                    const monthStr = month.toString().padStart(2, '0');
+                    const value = `${year}-${monthStr}`;
+                    const text = `${monthStr}/${year}`;
+                    const selected = value === selectedValue ? 'selected' : '';
+                    optionsHtml += `<option value="${value}" ${selected}>${text}</option>`;
+                }
+            }
+            return optionsHtml;
+        }
+
+        // Função para popular a tabela de referência do teto
+        function popularTabelaTeto() {
+            tetoTableBody.innerHTML = ''; // Limpa a tabela antes de popular
+            Object.entries(dadosTeto).sort(([a],[b]) => b - a).forEach(([ano, { teto, contribuicaoMaxima }]) => {
+                const row = document.createElement('tr');
+                row.className = 'border-b hover:bg-gray-50';
+                row.innerHTML = `
+                    <td class="px-6 py-4 font-medium text-gray-900 whitespace-nowrap">${ano}</td>
+                    <td class="px-6 py-4">${formatCurrency(teto)}</td>
+                    <td class="px-6 py-4">${formatCurrency(contribuicaoMaxima)}</td>
+                `;
+                tetoTableBody.appendChild(row);
+            });
+        }
+
+        // Função para criar uma nova linha na calculadora
+        function criarLinhaCalculadora(data = { comp: '', rem1: '', inss1: '', rem2: '', inss2: '' }) {
+            const row = document.createElement('tr');
+            row.className = 'bg-white border-b hover:bg-gray-50';
+            const monthOptions = generateMonthOptions(data.comp);
+            row.innerHTML = `
+                <td class="px-2 py-2"><select class="competencia-select w-full p-2 border rounded-md bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500">${monthOptions}</select></td>
+                <td class="px-2 py-2"><input type="number" step="0.01" placeholder="6000,00" value="${data.rem1}" class="remun-input-1 w-full p-2 border rounded-md text-right focus:outline-none focus:ring-2 focus:ring-blue-500"></td>
+                <td class="px-2 py-2"><input type="number" step="0.01" placeholder="547,06" value="${data.inss1}" class="inss-input-1 w-full p-2 border rounded-md text-right focus:outline-none focus:ring-2 focus:ring-blue-500"></td>
+                <td class="px-2 py-2"><input type="number" step="0.01" placeholder="5000,00" value="${data.rem2}" class="remun-input-2 w-full p-2 border rounded-md text-right focus:outline-none focus:ring-2 focus:ring-blue-500"></td>
+                <td class="px-2 py-2"><input type="number" step="0.01" placeholder="450,90" value="${data.inss2}" class="inss-input-2 w-full p-2 border rounded-md text-right focus:outline-none focus:ring-2 focus:ring-blue-500"></td>
+                <td class="px-2 py-2"><span class="total-remun block text-right p-2">R$ 0,00</span></td>
+                <td class="px-2 py-2"><span class="total-inss block text-right p-2">R$ 0,00</span></td>
+                <td class="px-2 py-2"><span class="teto-inss block text-right p-2">R$ 0,00</span></td>
+                <td class="px-2 py-2"><span class="cont-correta block text-right p-2">R$ 0,00</span></td>
+                <td class="px-2 py-2"><span class="valor-restituir block text-right p-2 font-bold text-green-700">R$ 0,00</span></td>
+            `;
+            mainCalcBody.appendChild(row);
+
+            // Adiciona os listeners de evento para a nova linha
+            const remun1 = row.querySelector('.remun-input-1');
+            const inss1 = row.querySelector('.inss-input-1');
+            const remun2 = row.querySelector('.remun-input-2');
+            const inss2 = row.querySelector('.inss-input-2');
+            const competenciaSelect = row.querySelector('.competencia-select');
+
+            const handlePrediction = (remunInput, inssInput) => {
+                const remuneracao = parseFloat(remunInput.value) || 0;
+                const competencia = competenciaSelect.value;
+                const ano = competencia ? parseInt(competencia.split('-')[0]) : null;
+                const inssPrevisto = calcularINSSPrevisto(remuneracao, ano);
+                
+                if (inssPrevisto > 0) {
+                    inssInput.value = inssPrevisto.toFixed(2);
+                } else {
+                    inssInput.value = '';
+                }
+                calcularLinha(row);
+            };
+
+            remun1.addEventListener('input', () => handlePrediction(remun1, inss1));
+            remun2.addEventListener('input', () => handlePrediction(remun2, inss2));
+            
+            competenciaSelect.addEventListener('input', () => {
+                handlePrediction(remun1, inss1);
+                handlePrediction(remun2, inss2);
+            });
+
+            inss1.addEventListener('input', () => calcularLinha(row));
+            inss2.addEventListener('input', () => calcularLinha(row));
+        }
+        
+        // Função para calcular os valores de uma linha específica
+        function calcularLinha(row) {
+            const competencia = row.querySelector('.competencia-select').value;
+            const rem1 = parseFloat(row.querySelector('.remun-input-1').value) || 0;
+            const inss1 = parseFloat(row.querySelector('.inss-input-1').value) || 0;
+            const rem2 = parseFloat(row.querySelector('.remun-input-2').value) || 0;
+            const inss2 = parseFloat(row.querySelector('.inss-input-2').value) || 0;
+
+            const ano = competencia ? parseInt(competencia.split('-')[0]) : null;
+            const dadosAno = ano ? dadosTeto[ano] : null;
+
+            const totalRemun = rem1 + rem2;
+            const totalINSS = inss1 + inss2;
+            const tetoCompetencia = dadosAno ? dadosAno.teto : 0;
+            const contCorreta = dadosAno ? dadosAno.contribuicaoMaxima : 0;
+            const valorARestituir = Math.max(0, totalINSS - contCorreta);
+
+            row.querySelector('.total-remun').textContent = formatCurrency(totalRemun);
+            row.querySelector('.total-inss').textContent = formatCurrency(totalINSS);
+            row.querySelector('.teto-inss').textContent = formatCurrency(tetoCompetencia);
+            row.querySelector('.cont-correta').textContent = formatCurrency(contCorreta);
+            row.querySelector('.valor-restituir').textContent = formatCurrency(valorARestituir);
+            
+            calcularTotalGeral();
+        }
+
+        // Função para calcular o total geral a restituir
+        function calcularTotalGeral() {
+            let total = 0;
+            document.querySelectorAll('.valor-restituir').forEach(cell => {
+                total += parseCurrency(cell.textContent);
+            });
+            totalRestituirCell.textContent = formatCurrency(total);
+        }
+
+        // Função para exportar os dados para um arquivo Excel
+        function exportarParaExcel() {
+            const tetoData = [["Ano", "Valor Mensal do Teto (R$)", "Contribuição Máxima (R$)"]];
+            Object.entries(dadosTeto).forEach(([ano, dados]) => {
+                tetoData.push([parseInt(ano), dados.teto, dados.contribuicaoMaxima]);
+            });
+
+            const calcData = [["Competência (Mês/Ano)", "Fonte 1 Remun. (R$)", "Fonte 1 INSS Retido (R$)", "Fonte 2 Remun. (R$)", "Fonte 2 INSS Retido (R$)", "Total Remun. no Mês (R$)", "Total INSS Retido (R$)", "Teto INSS Competência (R$)", "Contribuição Correta (R$)", "Valor a Restituir (R$)"]];
+            mainCalcBody.querySelectorAll('tr').forEach(row => {
+                const competenciaValue = row.querySelector('select').value;
+                const competenciaText = competenciaValue ? `${competenciaValue.split('-')[1]}/${competenciaValue.split('-')[0]}` : '';
+                const rowData = [
+                    competenciaText,
+                    parseFloat(row.querySelector('.remun-input-1').value) || 0,
+                    parseFloat(row.querySelector('.inss-input-1').value) || 0,
+                    parseFloat(row.querySelector('.remun-input-2').value) || 0,
+                    parseFloat(row.querySelector('.inss-input-2').value) || 0,
+                    parseCurrency(row.querySelector('.total-remun').textContent),
+                    parseCurrency(row.querySelector('.total-inss').textContent),
+                    parseCurrency(row.querySelector('.teto-inss').textContent),
+                    parseCurrency(row.querySelector('.cont-correta').textContent),
+                    parseCurrency(row.querySelector('.valor-restituir').textContent)
+                ];
+                calcData.push(rowData);
+            });
+            
+            calcData.push([]);
+            calcData.push(["", "", "", "", "", "", "", "", "TOTAL A RESTITUIR:", parseCurrency(totalRestituirCell.textContent)]);
+
+            const wb = XLSX.utils.book_new();
+            const wsTeto = XLSX.utils.aoa_to_sheet(tetoData);
+            const wsCalc = XLSX.utils.aoa_to_sheet(calcData);
+            
+            XLSX.utils.book_append_sheet(wb, wsTeto, "Teto_INSS");
+            XLSX.utils.book_append_sheet(wb, wsCalc, "Calculo_Restituicao");
+
+            XLSX.writeFile(wb, "Calculadora_Restituicao_INSS.xlsx");
+        }
+
+
+        // --- INICIALIZAÇÃO E EVENTOS ---
+        document.addEventListener('DOMContentLoaded', () => {
+            popularTabelaTeto();
+            criarLinhaCalculadora({ comp: '2024-01', rem1: '6000', inss1: '642.34', rem2: '5000', inss2: '531.18' });
+            criarLinhaCalculadora({ comp: '2024-02', rem1: '6000', inss1: '642.34', rem2: '5000', inss2: '531.18' });
+            criarLinhaCalculadora();
+            
+            mainCalcBody.querySelectorAll('tr').forEach(row => calcularLinha(row));
+        });
+
+        addRowBtn.addEventListener('click', () => criarLinhaCalculadora());
+        exportBtn.addEventListener('click', exportarParaExcel);
+
+    </script>
+
+</body>
+</html>
